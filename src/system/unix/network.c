@@ -50,6 +50,14 @@ z_result_t _z_socket_set_non_blocking(const _z_sys_net_socket_t *sock) {
     return _Z_RES_OK;
 }
 
+// accept()/setsockopt() are BSD-socket-only concepts -- meaningless for a
+// serial fd (serial is point-to-point: both ends open(), neither
+// listens/accepts, see src/system/unix/serial.c) and unavailable at all on
+// a NuttX board with no network stack configured (no TCP/UDP/raweth
+// compiled in either). Called unconditionally by transport/manager.c and
+// transport/unicast/accept.c regardless of which link type is actually
+// configured, so this needs a stub rather than being omitted entirely.
+#if Z_FEATURE_LINK_TCP == 1 || Z_FEATURE_LINK_UDP_UNICAST == 1 || Z_FEATURE_RAWETH_TRANSPORT == 1
 z_result_t _z_socket_accept(const _z_sys_net_socket_t *sock_in, _z_sys_net_socket_t *sock_out) {
     struct sockaddr naddr;
     unsigned int nlen = sizeof(naddr);
@@ -92,6 +100,13 @@ z_result_t _z_socket_accept(const _z_sys_net_socket_t *sock_in, _z_sys_net_socke
     sock_out->_fd = con_socket;
     return _Z_RES_OK;
 }
+#else
+z_result_t _z_socket_accept(const _z_sys_net_socket_t *sock_in, _z_sys_net_socket_t *sock_out) {
+    (void)sock_in;
+    sock_out->_fd = -1;
+    _Z_ERROR_RETURN(_Z_ERR_GENERIC);
+}
+#endif
 
 void _z_socket_close(_z_sys_net_socket_t *sock) {
 #if Z_FEATURE_LINK_TLS == 1
@@ -107,7 +122,12 @@ void _z_socket_close(_z_sys_net_socket_t *sock) {
     }
 #endif
     if (sock->_fd >= 0) {
+        // shutdown() is BSD-socket-only -- meaningless (and unavailable, on
+        // a board with no network stack) for a plain fd like serial's.
+        // close() alone is correct and sufficient for those.
+#if Z_FEATURE_LINK_TCP == 1 || Z_FEATURE_LINK_UDP_UNICAST == 1 || Z_FEATURE_RAWETH_TRANSPORT == 1
         shutdown(sock->_fd, SHUT_RDWR);
+#endif
         close(sock->_fd);
         sock->_fd = -1;
     }
