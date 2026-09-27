@@ -855,6 +855,4 @@ size_t _z_send_udp_multicast(const _z_sys_net_socket_t sock, const uint8_t *ptr,
 #error "Bluetooth not supported yet on Unix port of Zenoh-Pico"
 #endif
 
-#if Z_FEATURE_LINK_SERIAL == 1
-#error "Serial not supported yet on Unix port of Zenoh-Pico"
-#endif
+// Serial link implemented in src/system/unix/serial.c
